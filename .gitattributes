@@ -1,0 +1,20 @@
+# Set default behavior to automatically normalize line endings
+* text=auto
+
+# Bash scripts should always use LF (for Linux compatibility)
+*.sh text eol=lf
+
+# Markdown files
+*.md text eol=lf
+
+# JSON files
+*.json text eol=lf
+
+# Environment files
+.env* text eol=lf
+
+# Documentation
+docs/* text eol=lf
+
+# Config files
+config/* text eol=lf

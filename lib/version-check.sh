@@ -1,0 +1,323 @@
+#!/bin/bash
+#
+# version-check.sh - Minecraft Bedrock Server version detection
+# Checks for updates from official Minecraft website
+#
+
+# Minecraft Bedrock Server download page
+readonly BEDROCK_DOWNLOAD_PAGE="https://www.minecraft.net/en-us/download/server/bedrock"
+
+#
+# Get current installed version from a server directory
+# Arguments:
+#   $1 - Server path
+# Returns:
+#   Version string (e.g., "1.20.51.01") or empty on failure
+#
+get_current_version() {
+    local server_path="$1"
+
+    if [[ ! -d "$server_path" ]]; then
+        log_error "Server directory does not exist: $server_path"
+        return 1
+    fi
+
+    local version=""
+
+    # Method 1: Try to get version from bedrock_server binary (if it supports --version)
+    if [[ -x "$server_path/bedrock_server" ]]; then
+        version=$("$server_path/bedrock_server" --version 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -n1)
+    fi
+
+    # Method 2: Parse release-notes.txt if exists
+    if [[ -z "$version" ]] && [[ -f "$server_path/release-notes.txt" ]]; then
+        # Look for version pattern in first few lines
+        version=$(head -n 10 "$server_path/release-notes.txt" | grep -oP '\b[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?\b' | head -n1)
+    fi
+
+    # Method 3: Check bedrock_server_how_to.html
+    if [[ -z "$version" ]] && [[ -f "$server_path/bedrock_server_how_to.html" ]]; then
+        version=$(grep -oP 'Version[:\s]+\K[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?' "$server_path/bedrock_server_how_to.html" | head -n1)
+    fi
+
+    if [[ -n "$version" ]]; then
+        log_debug "Current version detected: $version"
+        echo "$version"
+        return 0
+    else
+        log_warning "Could not detect current version in $server_path"
+        return 1
+    fi
+}
+
+#
+# Get latest Bedrock Server version and download URL
+# Returns:
+#   JSON object with version and url, or empty on failure
+#   Format: {"version": "1.20.51.01", "url": "https://..."}
+#
+get_latest_version_info() {
+    log_info "Checking for latest Minecraft Bedrock Server version..."
+
+    local temp_file
+    temp_file=$(mktemp)
+
+    # Download the Bedrock download page
+    if ! curl -s -L --max-time 30 "$BEDROCK_DOWNLOAD_PAGE" -o "$temp_file"; then
+        log_error "Failed to download Bedrock server page"
+        rm -f "$temp_file"
+        return 1
+    fi
+
+    # Extract Linux download URL
+    # Looking for pattern: https://...bin-linux/bedrock-server-X.X.X.X.zip
+    local download_url
+    download_url=$(grep -oP 'https://[^"]+bin-linux/bedrock-server-[0-9.]+\.zip' "$temp_file" | head -n1)
+
+    if [[ -z "$download_url" ]]; then
+        log_error "Could not find download URL on Bedrock server page"
+        log_debug "Page content saved to: $temp_file"
+        return 1
+    fi
+
+    # Extract version from URL
+    local version
+    version=$(echo "$download_url" | grep -oP 'bedrock-server-\K[0-9.]+(?=\.zip)')
+
+    if [[ -z "$version" ]]; then
+        log_error "Could not extract version from download URL: $download_url"
+        rm -f "$temp_file"
+        return 1
+    fi
+
+    rm -f "$temp_file"
+
+    log_info "Latest version found: $version"
+    log_debug "Download URL: $download_url"
+
+    # Return JSON
+    echo "{\"version\": \"$version\", \"url\": \"$download_url\"}"
+    return 0
+}
+
+#
+# Compare two version strings
+# Arguments:
+#   $1 - Version 1
+#   $2 - Version 2
+# Returns:
+#   0 if versions are equal
+#   1 if version 1 is less than version 2
+#   2 if version 1 is greater than version 2
+#
+compare_versions() {
+    local ver1="$1"
+    local ver2="$2"
+
+    if [[ "$ver1" == "$ver2" ]]; then
+        return 0
+    fi
+
+    # Split versions into arrays
+    IFS='.' read -ra ver1_parts <<< "$ver1"
+    IFS='.' read -ra ver2_parts <<< "$ver2"
+
+    # Compare each part
+    local max_parts=${#ver1_parts[@]}
+    if [[ ${#ver2_parts[@]} -gt $max_parts ]]; then
+        max_parts=${#ver2_parts[@]}
+    fi
+
+    for ((i=0; i<max_parts; i++)); do
+        local part1=${ver1_parts[$i]:-0}
+        local part2=${ver2_parts[$i]:-0}
+
+        if [[ $part1 -lt $part2 ]]; then
+            return 1
+        elif [[ $part1 -gt $part2 ]]; then
+            return 2
+        fi
+    done
+
+    return 0
+}
+
+#
+# Check if update is available
+# Arguments:
+#   $1 - Current version
+#   $2 - Latest version
+# Returns:
+#   0 if update available, 1 if not, 2 on error
+#
+is_update_available() {
+    local current="$1"
+    local latest="$2"
+
+    if [[ -z "$current" ]] || [[ -z "$latest" ]]; then
+        log_error "Invalid version comparison: current='$current', latest='$latest'"
+        return 2
+    fi
+
+    compare_versions "$current" "$latest"
+    local result=$?
+
+    if [[ $result -eq 1 ]]; then
+        log_info "Update available: $current -> $latest"
+        return 0
+    elif [[ $result -eq 0 ]]; then
+        log_info "Already up to date: $current"
+        return 1
+    else
+        log_info "Current version is newer than available: $current > $latest"
+        return 1
+    fi
+}
+
+#
+# Download Bedrock Server
+# Arguments:
+#   $1 - Download URL
+#   $2 - Destination file path
+# Returns:
+#   0 on success, 1 on failure
+#
+download_bedrock_server() {
+    local url="$1"
+    local dest="$2"
+
+    if [[ -z "$url" ]] || [[ -z "$dest" ]]; then
+        log_error "URL and destination required for download"
+        return 1
+    fi
+
+    log_info "Downloading Bedrock Server from: $url"
+    log_info "Destination: $dest"
+
+    # Create destination directory if needed
+    local dest_dir
+    dest_dir=$(dirname "$dest")
+    if [[ ! -d "$dest_dir" ]]; then
+        mkdir -p "$dest_dir" || {
+            log_error "Failed to create destination directory: $dest_dir"
+            return 1
+        }
+    fi
+
+    # Download with progress
+    if ! curl -L --max-time "$DOWNLOAD_TIMEOUT" --progress-bar "$url" -o "$dest"; then
+        log_error "Download failed"
+        rm -f "$dest"
+        return 1
+    fi
+
+    # Verify download
+    if [[ ! -f "$dest" ]]; then
+        log_error "Downloaded file does not exist: $dest"
+        return 1
+    fi
+
+    local file_size
+    file_size=$(stat -c%s "$dest" 2>/dev/null || stat -f%z "$dest" 2>/dev/null)
+
+    if [[ -z "$file_size" ]] || [[ $file_size -lt 1000000 ]]; then
+        log_error "Downloaded file is too small (${file_size:-0} bytes), possibly corrupted"
+        rm -f "$dest"
+        return 1
+    fi
+
+    log_info "Download successful (Size: $((file_size / 1024 / 1024)) MB)"
+
+    # Verify it's a valid zip file
+    if ! unzip -t "$dest" &>/dev/null; then
+        log_error "Downloaded file is not a valid zip archive"
+        rm -f "$dest"
+        return 1
+    fi
+
+    log_info "Download verified successfully"
+    return 0
+}
+
+#
+# Extract Bedrock Server archive
+# Arguments:
+#   $1 - Archive path (.zip)
+#   $2 - Destination directory
+# Returns:
+#   0 on success, 1 on failure
+#
+extract_bedrock_server() {
+    local archive="$1"
+    local dest_dir="$2"
+
+    if [[ ! -f "$archive" ]]; then
+        log_error "Archive file not found: $archive"
+        return 1
+    fi
+
+    if [[ -z "$dest_dir" ]]; then
+        log_error "Destination directory required"
+        return 1
+    fi
+
+    log_info "Extracting Bedrock Server to: $dest_dir"
+
+    # Create destination directory
+    if [[ ! -d "$dest_dir" ]]; then
+        mkdir -p "$dest_dir" || {
+            log_error "Failed to create destination directory: $dest_dir"
+            return 1
+        }
+    fi
+
+    # Extract archive
+    if ! unzip -q -o "$archive" -d "$dest_dir"; then
+        log_error "Failed to extract archive"
+        return 1
+    fi
+
+    log_info "Extraction successful"
+
+    # Set executable permission on bedrock_server
+    if [[ -f "$dest_dir/bedrock_server" ]]; then
+        chmod +x "$dest_dir/bedrock_server"
+        log_debug "Set executable permission on bedrock_server"
+    fi
+
+    return 0
+}
+
+#
+# Get version from archive without extracting
+# Arguments:
+#   $1 - Archive path (.zip)
+# Returns:
+#   Version string or empty on failure
+#
+get_version_from_archive() {
+    local archive="$1"
+
+    if [[ ! -f "$archive" ]]; then
+        log_error "Archive file not found: $archive"
+        return 1
+    fi
+
+    # Try to extract release-notes.txt to temp location
+    local temp_dir
+    temp_dir=$(mktemp -d)
+
+    if unzip -q -j "$archive" "release-notes.txt" -d "$temp_dir" 2>/dev/null; then
+        local version
+        version=$(head -n 10 "$temp_dir/release-notes.txt" | grep -oP '\b[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?\b' | head -n1)
+        rm -rf "$temp_dir"
+
+        if [[ -n "$version" ]]; then
+            echo "$version"
+            return 0
+        fi
+    fi
+
+    rm -rf "$temp_dir"
+    return 1
+}

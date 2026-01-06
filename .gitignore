@@ -1,0 +1,33 @@
+# Environment configuration
+.env
+
+# Logs
+logs/
+*.log
+
+# Backups
+backups/
+
+# Temporary files
+temp/
+tmp/
+
+# OS files
+.DS_Store
+Thumbs.db
+nul
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude settings
+.claude/
+
+# Runtime data
+*.pid
+*.seed
+*.pid.lock

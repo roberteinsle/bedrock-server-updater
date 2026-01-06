@@ -1,0 +1,38 @@
+{
+  "servers": [
+    {
+      "name": "ToJo",
+      "id": "6b7208be-109e-44b3-8206-3235bb3d9b1a",
+      "path": "/crafty/servers/6b7208be-109e-44b3-8206-3235bb3d9b1a"
+    },
+    {
+      "name": "JonasE",
+      "id": "a0c97c73-f7f9-4904-a670-6403e8d314a1",
+      "path": "/crafty/servers/a0c97c73-f7f9-4904-a670-6403e8d314a1"
+    },
+    {
+      "name": "TobiasE",
+      "id": "87b675ee-321b-4a02-8fc4-6407b38d5e9d",
+      "path": "/crafty/servers/87b675ee-321b-4a02-8fc4-6407b38d5e9d"
+    }
+  ],
+  "preserve_files": [
+    "allowlist.json",
+    "packetlimitconfig.json",
+    "permissions.json",
+    "profanity_filter.wlist",
+    "server.properties"
+  ],
+  "preserve_directories": [
+    "behavior_packs",
+    "resource_packs",
+    "config",
+    "definitions",
+    "worlds"
+  ],
+  "update_files": [
+    "bedrock_server",
+    "bedrock_server_how_to.html",
+    "release-notes.txt"
+  ]
+}
