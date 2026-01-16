@@ -1,68 +1,68 @@
 # Minecraft Bedrock Server Updater
 
-Automatisches Update-System für Minecraft Bedrock Server, die über Crafty Controller verwaltet werden.
+Automated update system for Minecraft Bedrock Servers managed through Crafty Controller.
 
 ## Features
 
-- Automatische Update-Erkennung von offiziellen Minecraft Bedrock Server Releases
-- Integration mit Crafty Controller API für sicheres Server-Management
-- Vollständige Backups vor jedem Update
-- Preservation von Konfigurationsdateien und Spielerdaten
-- Automatischer Rollback bei Fehlern
-- E-Mail-Benachrichtigungen (Success/Failure)
-- Umfassendes Logging
-- Cronjob-Integration für automatische tägliche Updates
+- Automatic update detection from official Minecraft Bedrock Server releases
+- Integration with Crafty Controller API for secure server management
+- Full backups before every update
+- Preservation of configuration files and player data
+- Automatic rollback on errors
+- Email notifications (success/failure)
+- Comprehensive logging
+- Cronjob integration for automatic daily updates
 
-## Voraussetzungen
+## Prerequisites
 
-- Linux System (Ubuntu/Debian empfohlen)
-- Crafty Controller 4.7.0 oder höher
+- Linux system (Ubuntu/Debian recommended)
+- Crafty Controller 4.7.0 or higher
 - Bash 4.0+
 - jq (JSON processor)
-- curl
+- curl or wget
 - tar
 
 ## Quick Start
 
 ```bash
-# Repository klonen
+# Clone repository
 cd /opt
 git clone https://github.com/roberteinsle/bedrock-server-updater.git
 cd bedrock-server-updater
 
-# Installationsscript ausführen
+# Run installation script
 sudo ./install.sh
 
-# Konfiguration anpassen
+# Adjust configuration
 sudo nano .env
 
-# Ersten Test durchführen
+# Run first test
 sudo ./update-bedrock.sh --dry-run
 ```
 
-## Konfiguration
+## Configuration
 
-Kopieren Sie `.env.example` zu `.env` und passen Sie die Werte an:
+Copy `.env.example` to `.env` and adjust the values:
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-### Erforderliche Konfiguration:
+### Required Configuration:
 
-- **CRAFTY_API_URL**: URL Ihrer Crafty Controller Instanz
-- **CRAFTY_API_TOKEN**: API Token von Crafty Controller
-- **SMTP_HOST**: SMTP Server für E-Mail-Benachrichtigungen
-- **SMTP_USER**: SMTP Benutzername
-- **SMTP_PASSWORD**: SMTP Passwort
-- **SMTP_TO**: E-Mail-Adresse für Benachrichtigungen
+- **CRAFTY_API_URL**: URL of your Crafty Controller instance
+- **CRAFTY_API_TOKEN**: API token from Crafty Controller
+- **SMTP_HOST**: SMTP server for email notifications
+- **SMTP_USER**: SMTP username
+- **SMTP_PASSWORD**: SMTP password
+- **SMTP_TO**: Email address for notifications
 
-Siehe [docs/CONFIGURATION.md](docs/CONFIGURATION.md) für Details.
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for details.
 
-## Server-Konfiguration
+## Server Configuration
 
-Die zu verwaltenden Minecraft Server werden in [config/server-list.json](config/server-list.json) definiert:
+The Minecraft servers to manage are defined in [config/server-list.json](config/server-list.json):
 
 ```json
 {
@@ -76,71 +76,71 @@ Die zu verwaltenden Minecraft Server werden in [config/server-list.json](config/
 }
 ```
 
-## Verwendung
+## Usage
 
-### Manueller Update-Check
+### Manual Update Check
 
 ```bash
 sudo /opt/bedrock-server-updater/update-bedrock.sh
 ```
 
-### Dry-Run (Test ohne Änderungen)
+### Dry-Run (Test without changes)
 
 ```bash
 sudo /opt/bedrock-server-updater/update-bedrock.sh --dry-run
 ```
 
-### Automatische Updates via Cronjob
+### Automatic Updates via Cronjob
 
-Das Installationsscript richtet automatisch einen täglichen Cronjob ein. Sie können die Zeit anpassen:
+The installation script automatically sets up a daily cronjob. You can adjust the time:
 
 ```bash
 sudo crontab -e
 
-# Beispiel: Täglich um 3:00 Uhr
+# Example: Daily at 3:00 AM
 0 3 * * * /opt/bedrock-server-updater/update-bedrock.sh
 ```
 
-## Sicherheit
+## Security
 
-- Alle Credentials werden in `.env` gespeichert (nicht in Git)
-- `.env` Datei hat Permissions 600 (nur Owner)
-- API-Tokens und Passwörter werden niemals geloggt
-- Backups werden mit restrictive Permissions gespeichert
+- All credentials are stored in `.env` (not in Git)
+- `.env` file has permissions 600 (owner only)
+- API tokens and passwords are never logged
+- Backups are stored with restrictive permissions
 
-## Fehlerbehandlung
+## Error Handling
 
-Das Script implementiert mehrere Sicherheitsmechanismen:
+The script implements several safety mechanisms:
 
-1. **Backup vor jedem Update**: Vollständiges Backup aller Server
-2. **Automatischer Rollback**: Bei Fehlern wird die alte Version wiederhergestellt
-3. **E-Mail-Benachrichtigungen**: Admins werden über Erfolg/Fehler informiert
-4. **Umfassendes Logging**: Alle Aktionen werden protokolliert
+1. **Backup before every update**: Full backup of all servers
+2. **Automatic rollback**: On errors, the old version is restored
+3. **Email notifications**: Admins are notified of success/failure
+4. **Comprehensive logging**: All actions are logged
 
-## Datei-Preservation
+## File Preservation
 
-Folgende Dateien werden während Updates NICHT überschrieben:
+The following files are NOT overwritten during updates:
 
 - `allowlist.json` - Whitelist
-- `packetlimitconfig.json` - Netzwerk-Einstellungen
-- `permissions.json` - Spielerrechte
-- `profanity_filter.wlist` - Wortfilter
-- `server.properties` - Server-Konfiguration
-- Verzeichnisse: `worlds/`, `behavior_packs/`, `resource_packs/`, `config/`, `definitions/`
+- `packetlimitconfig.json` - Network settings
+- `permissions.json` - Player permissions
+- `profanity_filter.wlist` - Word filter
+- `server.properties` - Server configuration
+- Directories: `worlds/`, `behavior_packs/`, `resource_packs/`, `config/`, `definitions/`
 
 ## Logs
 
-Logs werden gespeichert in:
+Logs are stored in:
 - `/opt/bedrock-server-updater/logs/update-YYYY-MM-DD.log`
-- Automatische Log-Rotation nach 30 Tagen
+- Automatic log rotation after 30 days
 
 ## Backups
 
-Backups werden gespeichert in:
+Backups are stored in:
 - `/opt/bedrock-server-updater/backups/backup-SERVERNAME-YYYY-MM-DD-HHmmss.tar.gz`
-- Standard Retention: 7 Tage (konfigurierbar)
+- Default retention: 7 days (configurable)
 
-## Dokumentation
+## Documentation
 
 - [Installation Guide](docs/INSTALLATION.md)
 - [Configuration Guide](docs/CONFIGURATION.md)
@@ -148,44 +148,44 @@ Backups werden gespeichert in:
 
 ## Troubleshooting
 
-### Script startet nicht
+### Script won't start
 ```bash
-# Permissions prüfen
+# Check permissions
 ls -la /opt/bedrock-server-updater/update-bedrock.sh
 
-# Ausführbar machen
+# Make executable
 chmod +x /opt/bedrock-server-updater/update-bedrock.sh
 ```
 
-### E-Mails werden nicht gesendet
+### Emails not being sent
 ```bash
-# SMTP-Einstellungen in .env prüfen
+# Check SMTP settings in .env
 cat /opt/bedrock-server-updater/.env
 
-# Manuellen E-Mail-Test durchführen
+# Run manual email test
 source /opt/bedrock-server-updater/lib/notification.sh
 send_email "Test" "This is a test email"
 ```
 
-### Crafty API Fehler
+### Crafty API errors
 ```bash
-# API Token prüfen
+# Check API token
 curl -H "Authorization: Bearer YOUR_TOKEN" \
      https://your-crafty-url/api/v2/servers
 ```
 
-## Lizenz
+## License
 
-MIT License - siehe [LICENSE](LICENSE)
+MIT License - see [LICENSE](LICENSE)
 
-## Autor
+## Author
 
 Robert Einsle - [robert@einsle.com](mailto:robert@einsle.com)
 
 ## Contributing
 
-Pull Requests sind willkommen! Bitte öffnen Sie zuerst ein Issue, um größere Änderungen zu besprechen.
+Pull requests are welcome! Please open an issue first to discuss major changes.
 
 ## Support
 
-Bei Problemen oder Fragen öffnen Sie bitte ein [GitHub Issue](https://github.com/roberteinsle/bedrock-server-updater/issues).
+For problems or questions, please open a [GitHub Issue](https://github.com/roberteinsle/bedrock-server-updater/issues).
