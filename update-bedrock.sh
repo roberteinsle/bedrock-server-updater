@@ -221,10 +221,27 @@ main() {
         return 1
     fi
 
+    # Validate that version_info contains valid JSON
+    if ! echo "$version_info" | jq empty 2>/dev/null; then
+        log_error "Invalid JSON response from version check"
+        log_debug "Response was: $version_info"
+        send_failure_notification "Could not check for updates" "Version Check"
+        EXIT_CODE=3
+        return 1
+    fi
+
     local latest_version
     latest_version=$(echo "$version_info" | jq -r '.version')
     local download_url
     download_url=$(echo "$version_info" | jq -r '.url')
+
+    if [[ -z "$latest_version" ]] || [[ -z "$download_url" ]]; then
+        log_error "Could not extract version or URL from response"
+        log_debug "Version: $latest_version, URL: $download_url"
+        send_failure_notification "Could not check for updates" "Version Check"
+        EXIT_CODE=3
+        return 1
+    fi
 
     log_info "Latest version available: $latest_version"
 
