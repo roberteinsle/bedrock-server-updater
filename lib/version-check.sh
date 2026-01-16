@@ -74,7 +74,10 @@ get_current_version() {
         return 0
     else
         log_warning "Could not detect current version in $server_path"
-        return 1
+        log_warning "This may be a corrupted or incomplete server installation"
+        log_info "Assuming version 0.0.0.0 to trigger update"
+        echo "0.0.0.0"
+        return 0
     fi
 }
 
