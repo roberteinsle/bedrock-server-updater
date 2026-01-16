@@ -97,13 +97,13 @@ _log() {
         echo "$log_entry" >> "$LOG_FILE"
     fi
 
-    # Write to console with color
-    if [[ -t 1 ]]; then
+    # Write to console with color (always to stderr to avoid polluting function outputs)
+    if [[ -t 2 ]]; then
         # Terminal output - use colors
-        echo -e "${color}[$timestamp] [$level]${COLOR_RESET} $message"
+        echo -e "${color}[$timestamp] [$level]${COLOR_RESET} $message" >&2
     else
         # Non-terminal output - no colors
-        echo "$log_entry"
+        echo "$log_entry" >&2
     fi
 }
 
