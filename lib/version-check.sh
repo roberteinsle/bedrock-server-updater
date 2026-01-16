@@ -49,16 +49,23 @@ get_current_version() {
     local version
     version=$(echo "$response" | jq -r '.data.version // .data.server_version // empty' 2>/dev/null)
 
-    if [[ -n "$version" ]] && [[ "$version" != "null" ]]; then
-        log_debug "Current version detected from Crafty API: $version"
-        echo "$version"
-        return 0
+    # Validate version format (must be numbers and dots, like 1.21.131)
+    if [[ -n "$version" ]] && [[ "$version" != "null" ]] && [[ "$version" != "false" ]] && [[ "$version" != "true" ]]; then
+        # Check if version matches expected format (numbers and dots)
+        if [[ "$version" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            log_debug "Current version detected from Crafty API: $version"
+            echo "$version"
+            return 0
+        else
+            log_warning "Invalid version format from Crafty API: $version"
+        fi
     else
         log_warning "Could not detect version from Crafty API response"
-        log_info "Assuming version 0.0.0.0 to trigger update"
-        echo "0.0.0.0"
-        return 0
     fi
+
+    log_info "Assuming version 0.0.0.0 to trigger update"
+    echo "0.0.0.0"
+    return 0
 }
 
 #
