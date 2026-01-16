@@ -18,6 +18,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source library functions
+# shellcheck source=lib/platform.sh
+source "${SCRIPT_DIR}/lib/platform.sh"
 # shellcheck source=lib/logger.sh
 source "${SCRIPT_DIR}/lib/logger.sh"
 # shellcheck source=lib/config.sh
@@ -139,10 +141,21 @@ done
 #
 main() {
     # Initialize logging
-    init_logging "${LOG_DIR:-/var/log/bedrock-updater}" "${LOG_LEVEL:-INFO}"
+    # Use local logs directory in dev mode or if LOG_DIR not set on non-Linux
+    local default_log_dir="/var/log/bedrock-updater"
+    if is_windows || [[ ! -d "/var/log" ]]; then
+        default_log_dir="${SCRIPT_DIR}/logs"
+    fi
+    init_logging "${LOG_DIR:-$default_log_dir}" "${LOG_LEVEL:-INFO}"
 
     # Log script start
     log_script_start "Bedrock Server Updater v1.0"
+
+    # Print platform information
+    print_platform_info
+
+    # Warn if not on Linux
+    warn_if_not_linux
 
     # Initialize configuration
     log_info "Loading configuration..."
@@ -162,13 +175,17 @@ main() {
         DRY_RUN=true
     fi
 
-    # Test Crafty API connection
-    log_info "Testing Crafty Controller API connection..."
-    if ! crafty_test_connection; then
-        log_error "Cannot connect to Crafty Controller API"
-        send_failure_notification "API connection failed" "Initialization"
-        EXIT_CODE=1
-        return 1
+    # Test Crafty API connection (skip in dev mode)
+    if ! is_dev_mode; then
+        log_info "Testing Crafty Controller API connection..."
+        if ! crafty_test_connection; then
+            log_error "Cannot connect to Crafty Controller API"
+            send_failure_notification "API connection failed" "Initialization"
+            EXIT_CODE=1
+            return 1
+        fi
+    else
+        log_warning "Dev mode: Skipping Crafty API connection test"
     fi
 
     # === PHASE 1: Version Check ===

@@ -4,6 +4,15 @@
 # Checks for updates from official Minecraft website
 #
 
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Source platform helpers if not already sourced
+if [[ -f "${SCRIPT_DIR}/lib/platform.sh" ]] && ! declare -f is_linux &>/dev/null; then
+    # shellcheck source=lib/platform.sh
+    source "${SCRIPT_DIR}/lib/platform.sh"
+fi
+
 # Minecraft Bedrock Server download page
 readonly BEDROCK_DOWNLOAD_PAGE="https://www.minecraft.net/en-us/download/server/bedrock"
 
@@ -17,16 +26,28 @@ readonly BEDROCK_DOWNLOAD_PAGE="https://www.minecraft.net/en-us/download/server/
 get_current_version() {
     local server_path="$1"
 
+    # In dev mode, allow non-existent paths for testing
     if [[ ! -d "$server_path" ]]; then
-        log_error "Server directory does not exist: $server_path"
-        return 1
+        if is_dev_mode; then
+            log_warning "Dev mode: Server directory does not exist: $server_path"
+            log_info "Dev mode: Returning mock version 0.0.0.0"
+            echo "0.0.0.0"
+            return 0
+        else
+            log_error "Server directory does not exist: $server_path"
+            return 1
+        fi
     fi
 
     local version=""
 
     # Method 1: Try to get version from bedrock_server binary (if it supports --version)
-    if [[ -x "$server_path/bedrock_server" ]]; then
-        version=$("$server_path/bedrock_server" --version 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -n1)
+    # Only on Linux to avoid hanging on incompatible binaries
+    if [[ -x "$server_path/bedrock_server" ]] && is_linux; then
+        version=$(timeout 5 "$server_path/bedrock_server" --version 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -n1)
+        if [[ -n "$version" ]]; then
+            log_debug "Version detected from binary: $version"
+        fi
     fi
 
     # Method 2: Parse release-notes.txt if exists
@@ -218,7 +239,7 @@ download_bedrock_server() {
     fi
 
     local file_size
-    file_size=$(stat -c%s "$dest" 2>/dev/null || stat -f%z "$dest" 2>/dev/null)
+    file_size=$(get_file_size "$dest")
 
     if [[ -z "$file_size" ]] || [[ $file_size -lt 1000000 ]]; then
         log_error "Downloaded file is too small (${file_size:-0} bytes), possibly corrupted"

@@ -7,6 +7,12 @@
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# Source platform helpers if not already sourced
+if [[ -f "${SCRIPT_DIR}/lib/platform.sh" ]] && ! declare -f is_linux &>/dev/null; then
+    # shellcheck source=lib/platform.sh
+    source "${SCRIPT_DIR}/lib/platform.sh"
+fi
+
 # Configuration variables
 CONFIG_LOADED=false
 
@@ -29,12 +35,15 @@ load_env_config() {
     log_info "Loading configuration from: $env_file"
 
     # Check file permissions (should be 600 for security)
-    local permissions
-    permissions=$(stat -c %a "$env_file" 2>/dev/null || stat -f %A "$env_file" 2>/dev/null)
+    # Skip permission check on Windows as it's not applicable
+    if ! is_windows; then
+        local permissions
+        permissions=$(get_file_permissions "$env_file")
 
-    if [[ "$permissions" != "600" ]] && [[ "$permissions" != "400" ]]; then
-        log_warning "Configuration file has insecure permissions: $permissions"
-        log_warning "Recommended: chmod 600 $env_file"
+        if [[ -n "$permissions" ]] && [[ "$permissions" != "600" ]] && [[ "$permissions" != "400" ]]; then
+            log_warning "Configuration file has insecure permissions: $permissions"
+            log_warning "Recommended: chmod 600 $env_file"
+        fi
     fi
 
     # Source the .env file
@@ -129,6 +138,13 @@ load_server_config() {
     fi
 
     log_info "Loading server configuration from: $config_file"
+
+    # Check if jq is available
+    if ! command -v jq &>/dev/null; then
+        log_error "jq is not installed - required for JSON parsing"
+        log_error "Install with: apt-get install jq (Linux) or download from https://stedolan.github.io/jq/"
+        return 1
+    fi
 
     # Validate JSON syntax
     if ! jq empty "$config_file" 2>/dev/null; then
