@@ -17,64 +17,44 @@ fi
 readonly BEDROCK_API_ENDPOINT="https://net-secondary.web.minecraft-services.net/api/v1.0/download/links"
 
 #
-# Get current installed version from a server directory
+# Get current installed version from Crafty Controller API
 # Arguments:
-#   $1 - Server path
+#   $1 - Server ID (from Crafty)
 # Returns:
-#   Version string (e.g., "1.20.51.01") or empty on failure
+#   Version string (e.g., "1.21.131.1") or "0.0.0.0" if unknown
 #
 get_current_version() {
-    local server_path="$1"
+    local server_id="$1"
 
-    # In dev mode, allow non-existent paths for testing
-    if [[ ! -d "$server_path" ]]; then
-        if is_dev_mode; then
-            log_warning "Dev mode: Server directory does not exist: $server_path"
-            log_info "Dev mode: Returning mock version 0.0.0.0"
-            echo "0.0.0.0"
-            return 0
-        else
-            log_error "Server directory does not exist: $server_path"
-            return 1
-        fi
+    # In dev mode, return mock version
+    if is_dev_mode; then
+        log_warning "Dev mode: Returning mock version 0.0.0.0"
+        echo "0.0.0.0"
+        return 0
     fi
 
-    local version=""
+    log_debug "Getting version for server ID: $server_id"
 
-    # Method 1: Parse release-notes.txt (most reliable method)
-    if [[ -f "$server_path/release-notes.txt" ]]; then
-        # Look for version pattern in first 50 lines (version may not be at the top)
-        version=$(head -n 50 "$server_path/release-notes.txt" | grep -oP '\b[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?\b' | head -n1)
-        if [[ -n "$version" ]]; then
-            log_debug "Version detected from release-notes.txt: $version"
-        fi
+    # Get server status from Crafty API
+    local response
+    if ! response=$(crafty_get_server_status "$server_id" 2>/dev/null); then
+        log_warning "Could not get server status from Crafty API"
+        log_info "Assuming version 0.0.0.0 to trigger update"
+        echo "0.0.0.0"
+        return 0
     fi
 
-    # Method 2: Check bedrock_server_how_to.html
-    if [[ -z "$version" ]] && [[ -f "$server_path/bedrock_server_how_to.html" ]]; then
-        version=$(grep -oP 'Version[:\s]+\K[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?' "$server_path/bedrock_server_how_to.html" | head -n1)
-        if [[ -n "$version" ]]; then
-            log_debug "Version detected from bedrock_server_how_to.html: $version"
-        fi
-    fi
+    # Extract version from API response
+    # Expected path: .data.version or similar
+    local version
+    version=$(echo "$response" | jq -r '.data.version // .data.server_version // empty' 2>/dev/null)
 
-    # Method 3: Try bedrock_server binary as last resort (may not support --version)
-    # Note: Bedrock server binary typically doesn't support --version flag
-    # This method is kept for compatibility but skipped by default to avoid hanging
-    # if [[ -z "$version" ]] && [[ -x "$server_path/bedrock_server" ]] && is_linux; then
-    #     version=$(timeout 5 "$server_path/bedrock_server" --version 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -n1)
-    #     if [[ -n "$version" ]]; then
-    #         log_debug "Version detected from binary: $version"
-    #     fi
-    # fi
-
-    if [[ -n "$version" ]]; then
-        log_debug "Current version detected: $version"
+    if [[ -n "$version" ]] && [[ "$version" != "null" ]]; then
+        log_debug "Current version detected from Crafty API: $version"
         echo "$version"
         return 0
     else
-        log_warning "Could not detect current version in $server_path"
-        log_warning "This may be a corrupted or incomplete server installation"
+        log_warning "Could not detect version from Crafty API response"
         log_info "Assuming version 0.0.0.0 to trigger update"
         echo "0.0.0.0"
         return 0

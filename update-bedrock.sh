@@ -192,18 +192,18 @@ main() {
     log_separator
     log_info "PHASE 1: Checking for updates..."
 
-    # Get current version from first server
+    # Get current version from first server via Crafty API
     local first_server
     first_server=$(get_server_names | head -n1)
-    local first_server_path
-    first_server_path=$(get_server_path "$first_server")
+    local first_server_id
+    first_server_id=$(get_server_id "$first_server")
 
     log_info "Checking current version from server: $first_server"
     local current_version
-    current_version=$(get_current_version "$first_server_path")
+    current_version=$(get_current_version "$first_server_id")
 
-    if [[ -z "$current_version" ]]; then
-        log_warning "Could not determine current version, assuming first-time setup"
+    if [[ -z "$current_version" ]] || [[ "$current_version" == "0.0.0.0" ]]; then
+        log_warning "Could not determine current version, assuming first-time setup or update needed"
         current_version="0.0.0.0"
     else
         log_info "Current version: $current_version"
