@@ -20,11 +20,11 @@ echo ""
 echo "=== Check release-notes.txt ==="
 if [[ -f "$SERVER_PATH/release-notes.txt" ]]; then
     echo "File exists!"
-    echo "First 10 lines:"
-    head -n 10 "$SERVER_PATH/release-notes.txt"
+    echo "First 50 lines:"
+    head -n 50 "$SERVER_PATH/release-notes.txt"
     echo ""
-    echo "Version detection test:"
-    head -n 10 "$SERVER_PATH/release-notes.txt" | grep -oP '\b[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?\b' | head -n1
+    echo "Version detection test (first 50 lines):"
+    head -n 50 "$SERVER_PATH/release-notes.txt" | grep -oP '\b[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?\b' | head -n1
 else
     echo "File NOT found!"
 fi

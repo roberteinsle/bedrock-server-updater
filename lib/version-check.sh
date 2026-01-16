@@ -43,8 +43,8 @@ get_current_version() {
 
     # Method 1: Parse release-notes.txt (most reliable method)
     if [[ -f "$server_path/release-notes.txt" ]]; then
-        # Look for version pattern in first few lines
-        version=$(head -n 10 "$server_path/release-notes.txt" | grep -oP '\b[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?\b' | head -n1)
+        # Look for version pattern in first 50 lines (version may not be at the top)
+        version=$(head -n 50 "$server_path/release-notes.txt" | grep -oP '\b[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?\b' | head -n1)
         if [[ -n "$version" ]]; then
             log_debug "Version detected from release-notes.txt: $version"
         fi
