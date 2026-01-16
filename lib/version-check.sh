@@ -246,9 +246,35 @@ download_bedrock_server() {
         }
     fi
 
-    # Download with progress
-    if ! curl -L --max-time "$DOWNLOAD_TIMEOUT" --progress-bar "$url" -o "$dest"; then
-        log_error "Download failed"
+    # Download with progress and retry logic
+    local max_retries=3
+    local retry_count=0
+    local download_success=false
+
+    while [[ $retry_count -lt $max_retries ]]; do
+        if [[ $retry_count -gt 0 ]]; then
+            log_info "Retry attempt $retry_count of $((max_retries - 1))..."
+            sleep 2
+        fi
+
+        # Try with HTTP/2 first, then fall back to HTTP/1.1 on subsequent retries
+        local curl_opts="-L --max-time $DOWNLOAD_TIMEOUT --progress-bar"
+        if [[ $retry_count -ge 2 ]]; then
+            log_info "Forcing HTTP/1.1 for this attempt..."
+            curl_opts="$curl_opts --http1.1"
+        fi
+
+        if curl $curl_opts "$url" -o "$dest"; then
+            download_success=true
+            break
+        fi
+
+        retry_count=$((retry_count + 1))
+        rm -f "$dest"
+    done
+
+    if [[ "$download_success" != "true" ]]; then
+        log_error "Download failed after $max_retries attempts"
         rm -f "$dest"
         return 1
     fi
