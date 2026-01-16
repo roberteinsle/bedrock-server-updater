@@ -13,8 +13,8 @@ if [[ -f "${SCRIPT_DIR}/lib/platform.sh" ]] && ! declare -f is_linux &>/dev/null
     source "${SCRIPT_DIR}/lib/platform.sh"
 fi
 
-# Minecraft Bedrock Server download page
-readonly BEDROCK_DOWNLOAD_PAGE="https://www.minecraft.net/en-us/download/server/bedrock"
+# Minecraft Bedrock Server API endpoint for download links
+readonly BEDROCK_API_ENDPOINT="https://net-secondary.web.minecraft-services.net/api/v1.0/download/links"
 
 #
 # Get current installed version from a server directory
@@ -93,22 +93,30 @@ get_latest_version_info() {
     local temp_file
     temp_file=$(mktemp)
 
-    # Download the Bedrock download page
-    # Note: minecraft.net requires User-Agent header to return content
-    if ! curl -s -L -A "Mozilla/5.0" --max-time 30 "$BEDROCK_DOWNLOAD_PAGE" -o "$temp_file"; then
-        log_error "Failed to download Bedrock server page"
+    # Download from Minecraft API endpoint (returns JSON with download links)
+    # This is more reliable than HTML scraping
+    if ! curl -s -L --max-time 30 "$BEDROCK_API_ENDPOINT" -o "$temp_file"; then
+        log_error "Failed to download from Minecraft API"
         rm -f "$temp_file"
         return 1
     fi
 
-    # Extract Linux download URL
-    # Looking for pattern: https://...bin-linux/bedrock-server-X.X.X.X.zip
+    # Check if jq is available
+    if ! command -v jq &>/dev/null; then
+        log_error "jq is not installed - required for JSON parsing"
+        rm -f "$temp_file"
+        return 1
+    fi
+
+    # Extract Linux download URL from JSON
+    # Expected format: {"bedrock-server-linux": "https://...bedrock-server-X.X.X.X.zip"}
     local download_url
-    download_url=$(grep -oP 'https://[^"]+bin-linux/bedrock-server-[0-9.]+\.zip' "$temp_file" | head -n1)
+    download_url=$(jq -r '."bedrock-server-linux" // empty' "$temp_file" 2>/dev/null)
 
     if [[ -z "$download_url" ]]; then
-        log_error "Could not find download URL on Bedrock server page"
-        log_debug "Page content saved to: $temp_file"
+        log_error "Could not find Linux download URL in API response"
+        log_debug "API response saved to: $temp_file"
+        rm -f "$temp_file"
         return 1
     fi
 
