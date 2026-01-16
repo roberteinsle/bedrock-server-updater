@@ -94,7 +94,8 @@ get_latest_version_info() {
     temp_file=$(mktemp)
 
     # Download the Bedrock download page
-    if ! curl -s -L --max-time 30 "$BEDROCK_DOWNLOAD_PAGE" -o "$temp_file"; then
+    # Note: minecraft.net requires User-Agent header to return content
+    if ! curl -s -L -A "Mozilla/5.0" --max-time 30 "$BEDROCK_DOWNLOAD_PAGE" -o "$temp_file"; then
         log_error "Failed to download Bedrock server page"
         rm -f "$temp_file"
         return 1
