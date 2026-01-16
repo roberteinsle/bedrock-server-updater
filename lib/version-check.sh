@@ -246,37 +246,28 @@ download_bedrock_server() {
         }
     fi
 
-    # Download with progress and retry logic
-    local max_retries=3
-    local retry_count=0
-    local download_success=false
+    # Download with wget (more reliable for large files than curl)
+    # Wget handles HTTP/2 better and has built-in retry logic
+    log_info "Starting download..."
 
-    while [[ $retry_count -lt $max_retries ]]; do
-        if [[ $retry_count -gt 0 ]]; then
-            log_info "Retry attempt $retry_count of $((max_retries - 1))..."
-            sleep 2
+    if command -v wget &>/dev/null; then
+        # Use wget with progress bar, timeout, and automatic retry
+        if ! wget --timeout="$DOWNLOAD_TIMEOUT" --tries=3 --progress=bar:force "$url" -O "$dest" 2>&1 | \
+            while IFS= read -r line; do
+                echo "$line" >&2
+            done; then
+            log_error "Download failed with wget"
+            rm -f "$dest"
+            return 1
         fi
-
-        # Try with HTTP/2 first, then fall back to HTTP/1.1 on subsequent retries
-        local curl_opts="-L --max-time $DOWNLOAD_TIMEOUT --progress-bar"
-        if [[ $retry_count -ge 2 ]]; then
-            log_info "Forcing HTTP/1.1 for this attempt..."
-            curl_opts="$curl_opts --http1.1"
+    else
+        # Fallback to curl with HTTP/1.1 forced (more reliable than HTTP/2 for this server)
+        log_warning "wget not available, using curl with HTTP/1.1"
+        if ! curl -L --http1.1 --max-time "$DOWNLOAD_TIMEOUT" --progress-bar "$url" -o "$dest"; then
+            log_error "Download failed with curl"
+            rm -f "$dest"
+            return 1
         fi
-
-        if curl $curl_opts "$url" -o "$dest"; then
-            download_success=true
-            break
-        fi
-
-        retry_count=$((retry_count + 1))
-        rm -f "$dest"
-    done
-
-    if [[ "$download_success" != "true" ]]; then
-        log_error "Download failed after $max_retries attempts"
-        rm -f "$dest"
-        return 1
     fi
 
     # Verify download
