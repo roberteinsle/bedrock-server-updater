@@ -41,25 +41,32 @@ get_current_version() {
 
     local version=""
 
-    # Method 1: Try to get version from bedrock_server binary (if it supports --version)
-    # Only on Linux to avoid hanging on incompatible binaries
-    if [[ -x "$server_path/bedrock_server" ]] && is_linux; then
-        version=$(timeout 5 "$server_path/bedrock_server" --version 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -n1)
+    # Method 1: Parse release-notes.txt (most reliable method)
+    if [[ -f "$server_path/release-notes.txt" ]]; then
+        # Look for version pattern in first few lines
+        version=$(head -n 10 "$server_path/release-notes.txt" | grep -oP '\b[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?\b' | head -n1)
         if [[ -n "$version" ]]; then
-            log_debug "Version detected from binary: $version"
+            log_debug "Version detected from release-notes.txt: $version"
         fi
     fi
 
-    # Method 2: Parse release-notes.txt if exists
-    if [[ -z "$version" ]] && [[ -f "$server_path/release-notes.txt" ]]; then
-        # Look for version pattern in first few lines
-        version=$(head -n 10 "$server_path/release-notes.txt" | grep -oP '\b[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?\b' | head -n1)
-    fi
-
-    # Method 3: Check bedrock_server_how_to.html
+    # Method 2: Check bedrock_server_how_to.html
     if [[ -z "$version" ]] && [[ -f "$server_path/bedrock_server_how_to.html" ]]; then
         version=$(grep -oP 'Version[:\s]+\K[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?' "$server_path/bedrock_server_how_to.html" | head -n1)
+        if [[ -n "$version" ]]; then
+            log_debug "Version detected from bedrock_server_how_to.html: $version"
+        fi
     fi
+
+    # Method 3: Try bedrock_server binary as last resort (may not support --version)
+    # Note: Bedrock server binary typically doesn't support --version flag
+    # This method is kept for compatibility but skipped by default to avoid hanging
+    # if [[ -z "$version" ]] && [[ -x "$server_path/bedrock_server" ]] && is_linux; then
+    #     version=$(timeout 5 "$server_path/bedrock_server" --version 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -n1)
+    #     if [[ -n "$version" ]]; then
+    #         log_debug "Version detected from binary: $version"
+    #     fi
+    # fi
 
     if [[ -n "$version" ]]; then
         log_debug "Current version detected: $version"
