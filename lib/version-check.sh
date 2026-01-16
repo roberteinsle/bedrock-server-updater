@@ -89,9 +89,9 @@ get_latest_version_info() {
     fi
 
     # Extract Linux download URL from JSON
-    # Expected format: {"bedrock-server-linux": "https://...bedrock-server-X.X.X.X.zip"}
+    # API returns: {"result": {"links": [{"downloadType": "serverBedrockLinux", "downloadUrl": "..."}]}}
     local download_url
-    download_url=$(jq -r '."bedrock-server-linux" // empty' "$temp_file" 2>/dev/null)
+    download_url=$(jq -r '.result.links[] | select(.downloadType == "serverBedrockLinux") | .downloadUrl' "$temp_file" 2>/dev/null)
 
     if [[ -z "$download_url" ]]; then
         log_error "Could not find Linux download URL in API response"
