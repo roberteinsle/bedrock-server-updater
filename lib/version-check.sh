@@ -81,6 +81,13 @@ get_latest_version_info() {
         return 1
     fi
 
+    # Verify file was downloaded and has content
+    if [[ ! -s "$temp_file" ]]; then
+        log_error "Downloaded file is empty"
+        rm -f "$temp_file"
+        return 1
+    fi
+
     # Check if jq is available
     if ! command -v jq &>/dev/null; then
         log_error "jq is not installed - required for JSON parsing"
@@ -88,10 +95,18 @@ get_latest_version_info() {
         return 1
     fi
 
+    # Validate JSON before parsing
+    if ! jq empty "$temp_file" 2>/dev/null; then
+        log_error "Downloaded content is not valid JSON"
+        log_debug "Content: $(cat "$temp_file")"
+        rm -f "$temp_file"
+        return 1
+    fi
+
     # Extract Linux download URL from JSON
     # API returns: {"result": {"links": [{"downloadType": "serverBedrockLinux", "downloadUrl": "..."}]}}
     local download_url
-    download_url=$(jq -r '.result.links[] | select(.downloadType == "serverBedrockLinux") | .downloadUrl' "$temp_file" 2>/dev/null)
+    download_url=$(jq -r '.result.links[] | select(.downloadType == "serverBedrockLinux") | .downloadUrl' "$temp_file")
 
     if [[ -z "$download_url" ]]; then
         log_error "Could not find Linux download URL in API response"
